@@ -1,0 +1,38 @@
+#!/bin/bash
+KLIPPER=~/klipper
+KATAPULT=~/katapult
+KATAPULT_ENV=~/katapult-env
+message() {
+	echo
+	echo ===== "$@" =====
+	echo
+}
+set -eu
+cd $(dirname $0)
+for conf in config.*; do
+	varname=${conf#config.}
+	message Building variant $varname
+	cat $conf > exp_$conf
+	make -C $KLIPPER KCONFIG_CONFIG:=$PWD/exp_$conf OUT:=$PWD/out.$varname/ olddefconfig
+	make -C $KLIPPER KCONFIG_CONFIG:=$PWD/exp_$conf OUT:=$PWD/out.$varname/ clean
+	make -C $KLIPPER KCONFIG_CONFIG:=$PWD/exp_$conf OUT:=$PWD/out.$varname/ -j $(nproc)
+done
+sudo systemctl stop klipper
+for dev in /dev/serial/by-id/usb-Klipper_*; do
+	devbase=${dev##*/}
+	devname=${devbase#usb-Klipper_}
+	chipname=${devname%_*}
+	for varname in $chipname $devname $devbase NOT-FOUND; do
+		if test "$varname" = NOT-FOUND; then
+			message "ERROR: No suitable configuration found for $dev"
+			exit 1
+		fi
+		test -r config.$varname || continue
+		break
+	done
+	message Flashing variant $varname to $dev
+	#make KCONFIG_CONFIG:=$PWD/exp_config.$varname OUT:=out.$varname/ flash FLASH_DEVICE=$dev
+	$KATAPULT_ENV/bin/python3 $KATAPULT/scripts/flashtool.py -d $dev -f out.$varname/klipper.bin
+done
+sudo systemctl start klipper
+message All devices flashed
