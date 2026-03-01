@@ -17,7 +17,3 @@ the locations the respective software is installed on your system.
 Next, you need to place config files for all your devices into config files,
 similar to the `config.stm32f446xx` file for my Leviathan MCU or the
 `config.rp2040` file for my Nitehawk SB toolhead board.
-
-The script currently assumes that all devices can be flashed through
-[Katapult](https://github.com/Arksine/katapult).  For systems where this is
-not the case the implementation needs to be updated.

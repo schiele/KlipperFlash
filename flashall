@@ -1,7 +1,5 @@
 #!/bin/bash
 KLIPPER=~/klipper
-KATAPULT=~/katapult
-KATAPULT_ENV=~/katapult-env
 message() {
 	echo
 	echo ===== "$@" =====
@@ -31,8 +29,7 @@ for dev in /dev/serial/by-id/usb-Klipper_*; do
 		break
 	done
 	message Flashing variant $varname to $dev
-	#make KCONFIG_CONFIG:=$PWD/exp_config.$varname OUT:=out.$varname/ flash FLASH_DEVICE=$dev
-	$KATAPULT_ENV/bin/python3 $KATAPULT/scripts/flashtool.py -d $dev -f out.$varname/klipper.bin
+	make -C $KLIPPER KCONFIG_CONFIG:=$PWD/exp_config.$varname OUT:=$PWD/out.$varname/ flash FLASH_DEVICE=$dev
 done
 sudo systemctl start klipper
 message All devices flashed
