@@ -5,8 +5,28 @@ message() {
 	echo ===== "$@" =====
 	echo
 }
+maybe() {
+	if test $dryrun; then
+		message '[DRYRUN]' "$@"
+	else
+		"$@"
+	fi
+}
 set -eu
 cd $(dirname $0)
+buildonly=
+dryrun=
+while test $# -gt 0; do
+	case "$1" in
+		-b|--build) buildonly=1;;
+		-d|--dry) dryrun=1;;
+		*)
+			message "ERROR: Unknown command line option $1"
+			exit 1
+			;;
+	esac
+	shift
+done
 for conf in config.*; do
 	varname=${conf#config.}
 	message Building variant $varname
@@ -15,7 +35,11 @@ for conf in config.*; do
 	make -C $KLIPPER KCONFIG_CONFIG:=$PWD/exp_$conf OUT:=$PWD/out.$varname/ clean
 	make -C $KLIPPER KCONFIG_CONFIG:=$PWD/exp_$conf OUT:=$PWD/out.$varname/ -j $(nproc)
 done
-sudo systemctl stop klipper
+if test $buildonly; then
+	message Building completed, flashing skipped.
+	exit 1
+fi
+maybe sudo systemctl stop klipper
 for dev in /dev/serial/by-id/usb-Klipper_*; do
 	devbase=${dev##*/}
 	devname=${devbase#usb-Klipper_}
@@ -29,7 +53,7 @@ for dev in /dev/serial/by-id/usb-Klipper_*; do
 		break
 	done
 	message Flashing variant $varname to $dev
-	make -C $KLIPPER KCONFIG_CONFIG:=$PWD/exp_config.$varname OUT:=$PWD/out.$varname/ flash FLASH_DEVICE=$dev
+	maybe make -C $KLIPPER KCONFIG_CONFIG:=$PWD/exp_config.$varname OUT:=$PWD/out.$varname/ flash FLASH_DEVICE=$dev
 done
-sudo systemctl start klipper
+maybe sudo systemctl start klipper
 message All devices flashed
