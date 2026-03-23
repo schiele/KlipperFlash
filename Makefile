@@ -1,4 +1,4 @@
-KLIPPER := ~/klipper
+include config.global
 
 CONFIG_FILES := $(wildcard config.*)
 VARIANTS := $(CONFIG_FILES:config.%=%)
@@ -26,7 +26,7 @@ all: flashall buildall
 
 exp_config.%: config.%
 	@echo Expanding $< to $@
-	$(Q)cat $< > $@
+	$(Q)grep -v '^KLIPPERFLASH' $< > $@
 	$(Q)$(call KLIPPERMAKE,$*) olddefconfig
 
 build.%: exp_config.%
@@ -34,10 +34,14 @@ build.%: exp_config.%
 	$(Q)$(call KLIPPERMAKE,$*)
 	$(Q)touch $@
 
+FLASH_DEVICE = $(@:flash.%=/dev/serial/by-id/%)
+OUT = $(CURDIR)/out.$(<:build.%=%)/
+DEFAULT_FLASH_COMMAND = $(call KLIPPERMAKE,$(<:build.%=%)) flash FLASH_DEVICE=$(FLASH_DEVICE)
+
 define FLASH_RULE =
-flash.$1: $$(foreach t,build exp_config,$$t.$$(if $$(filter $1,$$(VARIANTS)),$1,$$(if $$(filter $(1:usb-Klipper_%=%),$$(VARIANTS)),$(1:usb-Klipper_%=%),$$(firstword $$(subst _, ,$(1:usb-Klipper_%=%)))))) stopklipper
+flash.$1: $$(foreach t,build exp_config config,$$t.$$(if $$(filter $1,$$(VARIANTS)),$1,$$(if $$(filter $(1:usb-Klipper_%=%),$$(VARIANTS)),$(1:usb-Klipper_%=%),$$(firstword $$(subst _, ,$(1:usb-Klipper_%=%)))))) stopklipper
 	@echo Flashing variant $$(<:build.%=%) to $$(@:flash.%=/dev/serial/by-id/%)
-	$$(Q)$$(D) $$(call KLIPPERMAKE,$$(<:build.%=%)) flash FLASH_DEVICE=$$(@:flash.%=/dev/serial/by-id/%)
+	$$(Q)$$(D) $$(shell (sed -ne '$$(foreach v,KLIPPER KATAPULT OUT FLASH_DEVICE,s|\$$$$($$v)|$$($$v)|g;)s/^KLIPPERFLASH_COMMAND *= *//p' $$(word 3,$$^);echo '$$(DEFAULT_FLASH_COMMAND)')| head -n 1)
 endef
 
 stopklipper:
